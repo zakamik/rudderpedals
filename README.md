@@ -1,4 +1,4 @@
-# rudderpedals
+# Rudder Pedals
 Joystick aviation pedals controller via atmega (Arduino) + magnetometer.
 
 You will need:
