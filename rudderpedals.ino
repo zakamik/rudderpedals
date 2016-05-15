@@ -1,9 +1,9 @@
 #include "Wire.h"
-
 // I2Cdev and HMC5883L must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
 #include "I2Cdev.h"
 #include "HMC5883L.h"
+#include "Joystick.h"
 
 HMC5883L mag;
 
@@ -11,8 +11,18 @@ int16_t mx, my, mz, x, y, z;
 float minheading=0, maxheading=0, heading=0, adjheading=0, CENTER=0, r_range=0, l_range=0, ADJ_C=0;
 bool ready=false;
 int i,cnt;
+bool serialOutput=false;
 
 bool state=0;
+
+#define BSIZE 3
+int16_t dx[BSIZE], dy[BSIZE], dz[BSIZE];
+int16_t posx=0,posy=0,posz=0;
+int16_t prevx=0, prevy=0, prevz=0;
+float dt=0, alpha=0, cx, cy, cz;
+uint32_t now=0, lastupdate=0, dtr;
+float mincx=0, maxcx=0, range=0;
+const float RC=0.5f;
 
 void dataReady() {
   state=state==0 ? 1 : 0;
@@ -29,7 +39,8 @@ void setup() {
 
     attachInterrupt(4, dataReady, RISING);
     // initialize device
-    Serial.println("Initializing I2C devices...");
+    if(serialOutput)
+      Serial.println("Initializing I2C devices...");
     mag.initialize();
     mag.setDataRate(HMC5883L_RATE_15);
     mag.setGain(HMC5883L_GAIN_220);
@@ -45,19 +56,13 @@ void setup() {
         cnt++;
       } else {
         delay(5);
-        Serial.println("not ready...");
+        if(serialOutput)
+          Serial.println("not ready...");
       }
     }
     CENTER/=30;
+    minheading=maxheading=CENTER;
 }
-#define BSIZE 3
-int16_t dx[BSIZE], dy[BSIZE], dz[BSIZE];
-int16_t posx=0,posy=0,posz=0;
-int16_t prevx=0, prevy=0, prevz=0;
-float dt=0, alpha=0, cx, cy, cz;
-uint32_t now=0, lastupdate=0, dtr;
-float mincx=0, maxcx=0, range=0;
-const float RC=0.5f;
 
 
 void loop() {
@@ -91,7 +96,7 @@ void loop() {
 
     minheading = heading < minheading ? heading : minheading;
     maxheading = heading > maxheading ? heading : maxheading;
-    ADJ_C=CENTER-minheading;
+    ADJ_C=CENTER - minheading;
     l_range=ADJ_C;
     r_range=maxheading-CENTER;
     range=maxheading-minheading;
@@ -99,24 +104,38 @@ void loop() {
     adjheading=(1-adjheading)/2*65535;
 
 
-    Serial.print("lowp:\t"); 
-    Serial.print(dtr); Serial.print("\t");
-    Serial.print("minmaxrange:"); Serial.print("\t");
-    Serial.print(minheading); Serial.print("\t");
-    Serial.print(maxheading); Serial.print("\t");
-    Serial.print(range); Serial.print("\t");
-    Serial.print("hdg:"); Serial.print("\t");
-    Serial.print(heading,3); Serial.print("\t");
-    Serial.print(adjheading); Serial.print("\t");
-    Serial.print(CENTER,3); Serial.print("\t");
-    Serial.print(ADJ_C,3); Serial.print("\t");
-    Serial.print("range:"); Serial.print("\t");
-    Serial.print(l_range); Serial.print("\t");
-    Serial.print(r_range); Serial.print("\t");
-    Serial.print("xyz:"); Serial.print("\t");
-    Serial.print(mx); Serial.print("\t");
-    Serial.print(my); Serial.print("\t");
-    Serial.println(mz);
+    if(serialOutput) {
+      Serial.print("lowp:\t"); 
+      Serial.print(dtr); Serial.print("\t");
+      Serial.print("minmaxrange:"); Serial.print("\t");
+      Serial.print(minheading); Serial.print("\t");
+      Serial.print(maxheading); Serial.print("\t");
+      Serial.print(range); Serial.print("\t");
+      Serial.print("hdg:"); Serial.print("\t");
+      Serial.print(heading,3); Serial.print("\t");
+      Serial.print(adjheading); Serial.print("\t");
+      Serial.print(CENTER,3); Serial.print("\t");
+      Serial.print(ADJ_C,3); Serial.print("\t");
+      Serial.print("range:"); Serial.print("\t");
+      Serial.print(l_range); Serial.print("\t");
+      Serial.print(r_range); Serial.print("\t");
+      Serial.print("xyz:"); Serial.print("\t");
+      Serial.print(mx); Serial.print("\t");
+      Serial.print(my); Serial.print("\t");
+      Serial.println(mz);
+    }
+    if(Serial.available()) {
+      char cmd=Serial.read();
+      switch (cmd) {
+        case '1':
+          serialOutput=true;
+          break;
+        case '0':
+          serialOutput=false;
+          break;
+        default:;        
+      }
+    }
 //    Serial.print(y); Serial.print("\t");
 //    Serial.println(z);
 
